@@ -1,0 +1,16 @@
+{
+  "name": "fibjs_server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./lib/index.js",
+  "types": "./@types/index.d.ts",
+  "private": false,
+  "author": "",
+  "homepage": "https://github.com/lhkzh/fibjs_server",
+  "license": "ISC",
+  "dependencies": {},
+  "devDependencies": {
+    "@fibjs/types": "^0.29.0"
+  },
+  "peerDependencies": {}
+}

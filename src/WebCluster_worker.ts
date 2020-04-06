@@ -1,0 +1,91 @@
+// see  https://github.com/fibjs-modules/cluster-server
+
+import * as util from "util";
+import * as mq from "mq";
+import * as vm from "vm";
+
+if(!global["$cbks"]){
+    global["$cbks"]={};
+}
+let clusterIndex;//当前第几个cluster
+let clusterTotal;//一共多少个cluster
+let httpHandler;//http监听器
+let httpJsDir;//require时 js脚本目录
+let httpJsFile;//主require的js文件
+let httpCrossOriginHeaders;//跨域的http消息头支持
+let globalKey;
+if(!global.Master)global.Master=Master;
+Master.onmessage = e => {
+    if (util.isFunction(e.data)) { // e.data.toString()=="Socket"
+        const con = e.data;
+        mq.invoke(httpHandler, con, () => con.close() );
+    } else if(e.data.fn=="init"){
+        clusterIndex=e.data.i;
+        clusterTotal=e.data.num;
+        httpJsFile=e.data.file;
+        httpJsDir=e.data.dir;
+        globalKey=e.data.globalKey;
+        editHttpHandler(e.data.crossOriginHeaders, e.data.serverName);
+        Master.postMessage('ready');
+    }else if(e.data.fn=="reload"){
+        // httpHandler = new mq.HttpHandler(new_web_handler());
+        // httpHandler.serverName="nginx";
+        // if(httpCrossOriginHeaders){
+        //     httpHandler.enableCrossOrigin(httpCrossOriginHeaders);
+        // }
+        try{
+            httpHandler.handler=new_web_handler();
+        }catch (e) {
+            console.error("WebCluster_worker|",e);
+        }
+    }else if(e.data.fn=="editServerInfo"){
+        editHttpHandler(e.data.crossOriginHeaders, e.data.serverName);
+    }else if(e.data.fn=="cbk"){
+        var fnWrap=global["$cbks"][e.data.i];
+        if(fnWrap){
+            delete global["$cbks"][e.data.i];
+            fnWrap.fn.apply(fnWrap.$, e.data.args);
+        }
+    }else if(e.data.fn=="fn_event_process"){
+        (<any>process).emit(e.data.type,e.data.value);
+    }else if(e.data.fn=="dispatch_events"){
+        (<any>process).emit(e.data.type,e.data.value);
+    }
+};
+function editHttpHandler(crossOriginHeaders:string, serverName?:string) {
+    try{
+        httpHandler = new mq.HttpHandler(new_web_handler());
+        httpCrossOriginHeaders=crossOriginHeaders;
+        if(crossOriginHeaders!=null) {
+            httpHandler.enableCrossOrigin(httpCrossOriginHeaders);
+        }
+        httpHandler.serverName=serverName||httpHandler.serverName||"nginx";
+    }catch (e) {
+        console.error("WebCluster_worker|",e);
+    }
+}
+function new_web_handler() {
+    const box= new vm.SandBox({},require);
+    global["vm_require"]=function(s){
+        // console.log(s);
+        return box.require(s, httpJsDir);
+    };
+    return box.require(httpJsFile, httpJsDir);
+}
+Master.postMessage('open');
+global["dispatch_events"]=(type,value)=>{
+    Master.postMessage({fn:"dispatch_events",type:type,value:value});
+    (<any>process).emit(type,value);
+}
+if(globalKey && !global.hasOwnProperty(globalKey))global[globalKey]={
+    cluster:{index:clusterIndex,total:clusterTotal},
+    close:()=>Master.postMessage("close"),
+    run:()=>Master.postMessage("run"),
+    reload:()=>Master.postMessage("reload"),
+    autoReload:(t:number=10000)=>{},
+    pause:()=>Master.postMessage("pause"),
+    reuse:()=>Master.postMessage("reuse"),
+    edit:(crossOrginHeaders:string, serverName?:string)=>{
+        Master.postMessage({fn:"editServerInfo",crossOrginHeaders:crossOrginHeaders,serverName:serverName});
+    }
+}
