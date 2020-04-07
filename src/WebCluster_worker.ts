@@ -7,25 +7,21 @@ import * as vm from "vm";
 if(!global["$cbks"]){
     global["$cbks"]={};
 }
-let clusterIndex;//当前第几个cluster
-let clusterTotal;//一共多少个cluster
-let httpHandler;//http监听器
-let httpJsDir;//require时 js脚本目录
-let httpJsFile;//主require的js文件
-let httpCrossOriginHeaders;//跨域的http消息头支持
-let globalKey;
+let clusterIndex:number;//当前第几个cluster
+let clusterTotal:number;//一共多少个cluster
+let httpHandler:Class_HttpHandler;//http监听器
+let httpJsDir:string;//require时 js脚本目录
+let httpJsFile:string;//主require的js文件
+let httpCrossOriginHeaders:string;//跨域的http消息头支持
+let httpServerName:string;//设置的http服务器名字
+let globalKey:string;
 if(!global.Master)global.Master=Master;
 Master.onmessage = e => {
-    if (util.isFunction(e.data)) { // e.data.toString()=="Socket"
+    if (util.isFunction(e.data.send)) { // e.data.toString()=="Socket"
         const con = e.data;
         mq.invoke(httpHandler, con, () => con.close() );
     } else if(e.data.fn=="init"){
-        clusterIndex=e.data.i;
-        clusterTotal=e.data.num;
-        httpJsFile=e.data.file;
-        httpJsDir=e.data.dir;
-        globalKey=e.data.globalKey;
-        editHttpHandler(e.data.crossOriginHeaders, e.data.serverName);
+        init(e.data);
         Master.postMessage('ready');
     }else if(e.data.fn=="reload"){
         // httpHandler = new mq.HttpHandler(new_web_handler());
@@ -52,14 +48,15 @@ Master.onmessage = e => {
         (<any>process).emit(e.data.type,e.data.value);
     }
 };
-function editHttpHandler(crossOriginHeaders:string, serverName?:string) {
+function editHttpHandler(crossOriginHeaders:string, serverName:string) {
+    httpServerName = serverName;
+    httpCrossOriginHeaders = crossOriginHeaders;
     try{
         httpHandler = new mq.HttpHandler(new_web_handler());
-        httpCrossOriginHeaders=crossOriginHeaders;
-        if(crossOriginHeaders!=null) {
+        if(httpCrossOriginHeaders!=null) {
             httpHandler.enableCrossOrigin(httpCrossOriginHeaders);
         }
-        httpHandler.serverName=serverName||httpHandler.serverName||"nginx";
+        httpHandler.serverName=httpServerName;
     }catch (e) {
         console.error("WebCluster_worker|",e);
     }
@@ -72,20 +69,29 @@ function new_web_handler() {
     };
     return box.require(httpJsFile, httpJsDir);
 }
-Master.postMessage('open');
-global["dispatch_events"]=(type,value)=>{
-    Master.postMessage({fn:"dispatch_events",type:type,value:value});
-    (<any>process).emit(type,value);
-}
-if(globalKey && !global.hasOwnProperty(globalKey))global[globalKey]={
-    cluster:{index:clusterIndex,total:clusterTotal},
-    close:()=>Master.postMessage("close"),
-    run:()=>Master.postMessage("run"),
-    reload:()=>Master.postMessage("reload"),
-    autoReload:(t:number=10000)=>{},
-    pause:()=>Master.postMessage("pause"),
-    reuse:()=>Master.postMessage("reuse"),
-    edit:(crossOrginHeaders:string, serverName?:string)=>{
-        Master.postMessage({fn:"editServerInfo",crossOrginHeaders:crossOrginHeaders,serverName:serverName});
+function init(data){
+    clusterIndex=data.i;
+    clusterTotal=data.num;
+    httpJsFile=data.file;
+    httpJsDir=data.dir;
+    globalKey=data.globalKey;
+    global["$WebClusterInfo"]={index:clusterIndex,total:clusterTotal};
+    global["dispatch_events"]=(type,value)=>{
+        Master.postMessage({fn:"dispatch_events",type:type,value:value});
+        (<any>process).emit(type,value);
     }
+    if(globalKey && !global.hasOwnProperty(globalKey))global[globalKey]={
+        cluster:{index:clusterIndex,total:clusterTotal},
+        close:()=>Master.postMessage("close"),
+        run:()=>Master.postMessage("run"),
+        reload:()=>Master.postMessage("reload"),
+        autoReload:(t:number=10000)=>{},
+        pause:()=>Master.postMessage("pause"),
+        reuse:()=>Master.postMessage("reuse"),
+        edit:(crossOrginHeaders:string, serverName?:string)=>{
+            Master.postMessage({fn:"editServerInfo",crossOrginHeaders:crossOrginHeaders,serverName:serverName});
+        }
+    }
+    editHttpHandler(data.crossOriginHeaders, data.serverName);
 }
+Master.postMessage('open');

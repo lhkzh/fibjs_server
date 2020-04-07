@@ -10,6 +10,7 @@ const defaultOptions = {
     worker: '',
     numbers: Math.max(1, os.cpuNumbers()-1),
     backlog:255,
+    serverName:"nginx",
 };
 const _worker = path.join(__dirname, 'WebCluster_worker.js');
 
@@ -24,6 +25,7 @@ export class WebCluster{
     private socket:Class_Socket;
     public cluster:{index:number,total:number};
     constructor(options:{worker:string, port:number, dir?:string, crossOriginHeaders?:string, serverName?:string,numbers?:number,backlog?:number,globalKey?:string}) {
+        delete options["mods"];
         let opts = Object.assign({}, defaultOptions, options);
         opts.dir=opts.dir||path.dirname(opts.worker);
         this.opts=opts;
@@ -43,6 +45,7 @@ export class WebCluster{
             self.clusters.push(self.newWorker(j, onReadyFn));
         }
         countDownEvent.wait();
+        self.post=self.post_real;
 
         self.on_exit=self.on_exit.bind(self);
         self.on_beforeExit=self.on_beforeExit.bind(self);
@@ -58,7 +61,7 @@ export class WebCluster{
         worker.onmessage = e => {
             if (util.isString(e.data)) {
                 if (e.data === 'open') {
-                    worker.postMessage({fn:"init", i:j, num:opts.numbers, file:opts.worker, dir:opts.dir, crossOriginHeaders:opts.crossOriginHeaders, serverName:opts.serverName});
+                    worker.postMessage({fn:"init", i:j, num:opts.numbers, file:opts.worker, dir:opts.dir, crossOriginHeaders:opts.crossOriginHeaders, serverName:opts.serverName, globalKey:opts.globalKey});
                 }else if (e.data === 'ready') {
                     onReady(j);
                 }else if(e.data === "reload") {
@@ -81,6 +84,11 @@ export class WebCluster{
                     self.on_dispatch_events({fromCid:worker["@id"],type:e.data.type,value:e.data.value});
                 }else if(e.data.fn=="editServerInfo"){
                     self.edit(e.data.crossOrginHeaders,e.data.serverName);
+                }else if(e.data.fn=="editConsole"){
+                    console.reset();
+                    e.data.cfgs.forEach(t=>{
+                        console.add(t);
+                    });
                 }
             }
         };
@@ -147,7 +155,7 @@ export class WebCluster{
             socket.listen(self.opts.backlog);
             let idx = 0;
             self.runIng = true;
-            coroutine.start(self.accept.bind(self), socket);
+            coroutine.start(self.accept.bind(self), self,socket);
         } catch (error) {
             console.warn(error.message,error.stack);
             if (error.number !== 9) {
@@ -161,37 +169,39 @@ export class WebCluster{
         console.warn(dateTimeStr(),"WebCluster.start",opts.port);
     }
     public edit(crossOrginHeaders:string,serverName?:string){
-        this.clusters.forEach(w=>{
-            w.postMessage({fn:"editServerInfo",crossOrginHeaders:crossOrginHeaders,serverName:serverName});
-        });
+        serverName=serverName||defaultOptions.serverName;
+        if(this.opts.crossOriginHeaders!=crossOrginHeaders || this.opts.serverName!=serverName){
+            this.opts.crossOriginHeaders=crossOrginHeaders;
+            this.opts.serverName=serverName;
+            this.post({fn:"editServerInfo",crossOrginHeaders:crossOrginHeaders,serverName:serverName});
+        }
     }
     private on_beforeExit(e){
-        this.clusters.forEach(w=>{
-            w.postMessage({fn:"fn_event_process", type:"beforeExit", value:e});
-        });
+        this.post({fn:"fn_event_process", type:"beforeExit", value:e});
         console.warn(dateTimeStr(),"WebCluster.shutDown");
         this.pause();
     }
     private on_exit(e){
-        this.clusters.forEach(w=>{
-            w.postMessage({fn:"fn_event_process", type:"exit", value:e});
-        });
+        this.post({fn:"fn_event_process", type:"exit", value:e});
         this.stop();
     }
     private on_SIGINT(e){
-        this.clusters.forEach(w=>{
-            w.postMessage({fn:"fn_event_process", type:"SIGINT", value:e});
-        });
+        this.post({fn:"fn_event_process", type:"SIGINT", value:e});
         this.reload();
         global.gc && global.gc();
     }
     private on_dispatch_events(e){
         if(e && e.key && e.value){
-            this.clusters.forEach(w=>{
-                if(w["@id"]!=e.fromCid){
-                    w.postMessage({fn:"dispatch_events",type:e.type,value:e.value});
-                }
-            });
+            this.post({fn:"dispatch_events",type:e.type,value:e.value}, e.fromCid);
         }
+    }
+    private post(d:any, exceptId?:number){
+    }
+    private post_real(d:any, exceptId?:number){
+        this.clusters.forEach(w=>{
+            if(w["@id"]!=exceptId){
+                w.postMessage(d);
+            }
+        });
     }
 }

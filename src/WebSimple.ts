@@ -99,7 +99,7 @@ export class WebSimple{
         this.reload();
     }
     private on_beforeExit(e){
-        console.warn(dateTimeStr(),"WebCluster.shutDown");
+        console.warn(dateTimeStr(),"WebSimple.shutDown");
         this.pause();
     }
     private on_exit(e){
