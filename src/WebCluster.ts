@@ -31,27 +31,12 @@ export class WebCluster{
         this.opts=opts;
         this.clusters=[];
 
-        const self = this;
-        const countDownEvent = new coroutine.Event();
-        const onReadys = [];
-        const onReadyFn = (i:number)=>{
-            onReadys.push(i);
-            if(onReadys.length==opts.numbers){
-                countDownEvent.set();
-            }
-        }
-        self.cluster={index:-1,total:opts.numbers}
-        for (let j = 0; j < opts.numbers; j++) {
-            self.clusters.push(self.newWorker(j, onReadyFn));
-        }
-        countDownEvent.wait();
-        self.post=self.post_real;
+        const self=this;
 
         self.on_exit=self.on_exit.bind(self);
         self.on_beforeExit=self.on_beforeExit.bind(self);
         self.on_SIGINT=self.on_SIGINT.bind(self);
         self.on_dispatch_events=self.on_dispatch_events.bind(self);
-        if(opts.globalKey && !global.hasOwnProperty(opts.globalKey))global[opts.globalKey]=self;
     }
     private newWorker(j:number, onReady:(j:number)=>void){
         const self = this;
@@ -94,8 +79,34 @@ export class WebCluster{
         };
         return worker;
     }
+    private startClusters(){
+        const self=this;
+        self.clusters.length=0;
+        const countDownEvent = new coroutine.Event();
+        const onReadys = [];
+        const onReadyFn = (i:number)=>{
+            onReadys.push(i);
+            if(onReadys.length==self.opts.numbers){
+                countDownEvent.set();
+            }
+        }
+        self.cluster={index:-1,total:self.opts.numbers}
+        for (let j = 0; j < self.opts.numbers; j++) {
+            self.clusters.push(self.newWorker(j, onReadyFn));
+        }
+        countDownEvent.wait();
+        self.post=self.post_real;
+        if(self.opts.globalKey && !global.hasOwnProperty(self.opts.globalKey))global[self.opts.globalKey]=self;
+    }
+    private stopClusters(){
+        const self=this;
+        let clusters = self.clusters;
+        self.post("@destory@");
+        self.clusters.length=0;
+    }
     public stop() {
         let self=this;
+        self.stopClusters();
         self.socket.close();
         self.socket = null;
         self.runIng = false;
@@ -148,6 +159,7 @@ export class WebCluster{
         if (self.runIng === true) {
             throw new Error('server is already running!');
         }
+        self.startClusters();
         const socket = self.socket = new net.Socket();;
         const opts = self.opts;
         try {

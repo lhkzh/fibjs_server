@@ -20,7 +20,15 @@ Master.onmessage = e => {
     if (util.isFunction(e.data.send)) { // e.data.toString()=="Socket"
         const con = e.data;
         mq.invoke(httpHandler, con, () => con.close() );
-    } else if(e.data.fn=="init"){
+    }else if(e.data=="@destory@"){
+        global["@DESTORYED"]=true;
+        const ems = <Class_EventEmitter><any>process;
+        ems.emit("beforeExit",-1);
+        ems.emit("exit",-1);
+        ems.removeAllListeners(ems.eventNames());
+        Master.onmessage=e=>{};
+        Master.postMessage=e=>{};
+    }else if(e.data.fn=="init"){
         init(e.data);
         Master.postMessage('ready');
     }else if(e.data.fn=="reload"){
