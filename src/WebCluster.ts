@@ -3,14 +3,14 @@ import * as os from "os";
 import * as util from "util";
 import * as coroutine from "coroutine";
 import * as net from "net";
+import {getServerOpts, WebServerConfig} from "./newWebServer";
 import {dateTimeStr} from "./dateTime";
 
 const defaultOptions = {
     port: 8000,
     worker: '',
     numbers: Math.max(1, os.cpuNumbers()-1),
-    backlog:255,
-    serverName:"nginx",
+    backlog:2048
 };
 const _worker = path.join(__dirname, 'WebCluster_worker.js');
 
@@ -18,17 +18,19 @@ const _worker = path.join(__dirname, 'WebCluster_worker.js');
  * 多worker实现的WebServer
  */
 export class WebCluster{
-    private opts:{worker:string, port:number, dir?:string, crossOriginHeaders?:string, serverName?:string,numbers?:number,backlog?:number,globalKey?:string};
+    private cfg:WebServerConfig;
+    private svr_opts:{[index:string]:number|string};
     private runIng:boolean;
     private pauseIng:boolean;
     private clusters:Class_Worker[];
     private socket:Class_Socket;
     public cluster:{index:number,total:number};
-    constructor(options:{worker:string, port:number, dir?:string, crossOriginHeaders?:string, serverName?:string,numbers?:number,backlog?:number,globalKey?:string}) {
+    constructor(options:WebServerConfig) {
         delete options["mods"];
-        let opts = Object.assign({}, defaultOptions, options);
-        opts.dir=opts.dir||path.dirname(opts.worker);
-        this.opts=opts;
+        let cfg:WebServerConfig = Object.assign({}, defaultOptions, options);
+        cfg.dir=cfg.dir||path.dirname(cfg.worker);
+        this.cfg=cfg;
+        this.svr_opts=getServerOpts(cfg);
         this.clusters=[];
 
         const self=this;
@@ -40,13 +42,13 @@ export class WebCluster{
     }
     private newWorker(j:number, onReady:(j:number)=>void){
         const self = this;
-        const opts = self.opts;
+        const cfg = self.cfg;
         const worker = new coroutine.Worker(_worker);
         worker["@id"]=j;
         worker.onmessage = e => {
             if (util.isString(e.data)) {
                 if (e.data === 'open') {
-                    worker.postMessage({fn:"init", i:j, num:opts.numbers, file:opts.worker, dir:opts.dir, crossOriginHeaders:opts.crossOriginHeaders, serverName:opts.serverName, globalKey:opts.globalKey});
+                    worker.postMessage({fn:"init", i:j, ...cfg});
                 }else if (e.data === 'ready') {
                     onReady(j);
                 }else if(e.data === "reload") {
@@ -68,12 +70,15 @@ export class WebCluster{
                 }else if(e.data.fn=="dispatch_events"){
                     self.on_dispatch_events({fromCid:worker["@id"],type:e.data.type,value:e.data.value});
                 }else if(e.data.fn=="editServerInfo"){
-                    self.edit(e.data.crossOrginHeaders,e.data.serverName);
+                    self.edit(e.data.crossOrginHeaders,e.data.opts);
                 }else if(e.data.fn=="editConsole"){
                     console.reset();
                     e.data.cfgs.forEach(t=>{
                         console.add(t);
                     });
+                    if(Number.isInteger(e.data.loglevel)){
+                        (<any>console).loglevel=<number>e.data.loglevel;
+                    }
                 }
             }
         };
@@ -86,17 +91,17 @@ export class WebCluster{
         const onReadys = [];
         const onReadyFn = (i:number)=>{
             onReadys.push(i);
-            if(onReadys.length==self.opts.numbers){
+            if(onReadys.length==self.cfg.numbers){
                 countDownEvent.set();
             }
         }
-        self.cluster={index:-1,total:self.opts.numbers}
-        for (let j = 0; j < self.opts.numbers; j++) {
+        self.cluster={index:-1,total:self.cfg.numbers}
+        for (let j = 0; j < self.cfg.numbers; j++) {
             self.clusters.push(self.newWorker(j, onReadyFn));
         }
         countDownEvent.wait();
         self.post=self.post_real;
-        if(self.opts.globalKey && !global.hasOwnProperty(self.opts.globalKey))global[self.opts.globalKey]=self;
+        if(self.cfg.globalKey && !global.hasOwnProperty(self.cfg.globalKey))global[self.cfg.globalKey]=self;
     }
     private stopClusters(){
         const self=this;
@@ -148,7 +153,7 @@ export class WebCluster{
                 con.close();
                 return;
             }
-            if (idx >= self.opts.numbers) {
+            if (idx >= self.cfg.numbers) {
                 idx = 0;
             }
             self.clusters[idx++].postMessage(con);
@@ -161,10 +166,10 @@ export class WebCluster{
         }
         self.startClusters();
         const socket = self.socket = new net.Socket();;
-        const opts = self.opts;
+        const opts = self.cfg;
         try {
             socket.bind(opts.port);
-            socket.listen(self.opts.backlog);
+            socket.listen(self.cfg.backlog);
             let idx = 0;
             self.runIng = true;
             coroutine.start(self.accept.bind(self), self,socket);
@@ -180,12 +185,23 @@ export class WebCluster{
         (<any>process).on("dispatch_events",self.on_dispatch_events);
         console.warn(dateTimeStr(),"WebCluster.start",opts.port);
     }
-    public edit(crossOrginHeaders:string,serverName?:string){
-        serverName=serverName||defaultOptions.serverName;
-        if(this.opts.crossOriginHeaders!=crossOrginHeaders || this.opts.serverName!=serverName){
-            this.opts.crossOriginHeaders=crossOrginHeaders;
-            this.opts.serverName=serverName;
-            this.post({fn:"editServerInfo",crossOrginHeaders:crossOrginHeaders,serverName:serverName});
+    private checkChangeAndApplyOpts(opts?:{[index:string]:number|string}){
+        let changed=false;
+        if(opts){
+            for(let k in this.svr_opts){
+                if(opts.hasOwnProperty(k) && opts[k] && opts[k]!=this.svr_opts[k]){
+                    changed=true;
+                    this.svr_opts[k] = opts[k];
+                }
+            }
+        }
+        return changed
+    }
+    public edit(crossOriginHeaders:string, opts?:{[index:string]:number|string}){
+        if(this.cfg.crossOriginHeaders!=crossOriginHeaders || this.checkChangeAndApplyOpts(opts)){
+            this.cfg.crossOriginHeaders=crossOriginHeaders;
+            this.cfg = {...this.cfg, ...this.svr_opts};
+            this.post({fn:"editServerInfo", crossOriginHeaders:this.cfg.crossOriginHeaders, opts:this.svr_opts});
         }
     }
     private on_beforeExit(e){

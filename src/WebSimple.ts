@@ -1,30 +1,33 @@
 /// <reference types="@fibjs/types" />
 /// <reference path="../@types/index.d.ts" />
-import {dateTimeStr} from "./dateTime";
 import * as path from "path";
 import * as http from "http";
 import * as vm from "vm";
 import * as coroutine from "coroutine";
-
+import {getServerOpts, WebServerConfig} from "./newWebServer";
+import * as util from "util";
+import {dateTimeStr} from "./dateTime";
 export class WebSimple{
     private port:number;
     private worker_file:string;
     private worker_dir:string;
+    private svr_opts:{[index:string]:number|string};
     private crossOriginHeaders:string;
-    private serverName:string;
     private sandboxMods:{[index:string]:any};
     private sandboxGlobal:any;
     private svr:Class_HttpServer;
     private opt_pause:boolean;
     private runIng:boolean;
-    public constructor(opts:{worker:string, port:number, crossOriginHeaders?:string, serverName?:string, mods?:{[index:string]:any}, global?:any,globalKey?:string}){
+    private logMore:boolean;
+    public constructor(opts:WebServerConfig){
         this.port=opts.port||8000;
         this.crossOriginHeaders=opts.crossOriginHeaders;
-        this.serverName=opts.serverName||"nginx";
+        this.svr_opts=getServerOpts(opts);
         this.worker_file=opts.worker;
         this.worker_dir=path.dirname(opts.worker);
         this.sandboxMods=opts.mods||{};
         this.sandboxGlobal=opts.global;
+        this.logMore=opts.logMore||false;
         this.on_exit=this.on_exit.bind(this);
         this.on_beforeExit=this.on_beforeExit.bind(this);
         this.on_SIGINT=this.on_SIGINT.bind(this);
@@ -43,7 +46,7 @@ export class WebSimple{
             return;
         }
         this.svr=new http.Server(this.port, this.new_handler());
-        this.edit(this.crossOriginHeaders, this.serverName);
+        this.edit(this.crossOriginHeaders, this.svr_opts);
         this.svr.start ? this.svr.start():this.svr["asyncRun"]();
         this.runIng=true;
         (<any>process).on("exit",this.on_beforeExit);
@@ -64,20 +67,40 @@ export class WebSimple{
         };
         return box.require(this.worker_file, dir);
     }
-    public edit(crossOrginHeaders:string,serverName?:string){
+    private checkChangeAndApplyOpts(opts?:{[index:string]:number|string}){
+        let changed=false;
+        if(opts){
+            for(let k in this.svr_opts){
+                if(opts.hasOwnProperty(k) && opts[k] && opts[k]!=this.svr_opts[k]){
+                    changed=true;
+                    this.svr_opts[k] = opts[k];
+                }
+            }
+        }
+        return changed
+    }
+    public edit(crossOrginHeaders:string, svr_opts?:{[index:string]:number|string}){
         this.crossOriginHeaders=crossOrginHeaders;
-        this.serverName=serverName;
+        this.checkChangeAndApplyOpts(svr_opts);
         if(!this.svr)return;
-        this.svr.serverName=this.serverName;
+        if(svr_opts){
+            for(var [k,v] of Object.entries(this.svr_opts)){
+                this.svr[k]=v;
+            }
+        }
         if(this.crossOriginHeaders!=null){
             this.svr.enableCrossOrigin(this.crossOriginHeaders);
         }
     }
     public reload(){
+        let t = Date.now();
         try{
             this.svr.handler=this.new_handler();
         }catch (e) {
-            console.error("WebSimple|",e);
+            console.error("WebSimple.reload",e);
+        }
+        if(this.logMore){
+            console.log("WebSimple.reload : %d ms",Date.now()-t);
         }
     }
     public autoReload(ttl:number=2000){
