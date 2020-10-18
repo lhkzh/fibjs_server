@@ -9,6 +9,7 @@ export interface WebServer {
     stop:()=>void,
     reload:()=>void,
     autoReload:(ttl?:number)=>void,
+    watchReload:(dirs: string[], ttl_afterEventToReload?:number)=>void,
     pause:()=>void,
     reuse:()=>void,
     edit:(crossOrginHeaders:string, svr_opts?:{[index:string]:number|string})=>void

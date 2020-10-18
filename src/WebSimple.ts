@@ -4,8 +4,8 @@ import * as path from "path";
 import * as http from "http";
 import * as vm from "vm";
 import * as coroutine from "coroutine";
+import * as fs from "fs";
 import {getServerOpts, WebServerConfig} from "./newWebServer";
-import * as util from "util";
 import {dateTimeStr} from "./dateTime";
 export class WebSimple{
     private port:number;
@@ -40,6 +40,11 @@ export class WebSimple{
         (<any>process).off("beforeExit",this.on_beforeExit);
         (<any>process).off("SIGINT",this.on_SIGINT);
         console.warn("WebSimple.stop");
+        if (this.watcherList) {
+            this.watcherList.forEach(e => e.close());
+            this.watcherList.length = 0;
+            clearTimeout(this.watch_file_delay_reload_timer);
+        }
     }
     public start(){
         if(this.svr!=null){
@@ -112,6 +117,33 @@ export class WebSimple{
                 self.reload();
             }
         })
+    }
+
+    private watcherList: Array<Class_FSWatcher>;
+    private watcherTtl: number;
+
+    public watchReload(dirs: string[], ttl = 3000) {
+        const self = this;
+        self.watcherTtl = ttl;
+        let watchs = self.watcherList = [];
+        let watch_fn = self.onFileWatch.bind(self);
+        dirs.forEach(e => {
+            watchs.push(fs.watch(e, {recursive:true}, watch_fn));
+        });
+    }
+
+    private watch_file_delay_reload_timer: Class_Timer;
+
+    private onFileWatch(e, k) {
+        let self = this;
+        if (self.watch_file_delay_reload_timer) {
+            clearTimeout(self.watch_file_delay_reload_timer);
+        }
+        self.watch_file_delay_reload_timer = setTimeout(() => {
+            self.watch_file_delay_reload_timer = null;
+            if (self.runIng)
+                self.reload();
+        }, self.watcherTtl);
     }
     public pause(){
         this.opt_pause=true;

@@ -3,6 +3,7 @@ import * as os from "os";
 import * as util from "util";
 import * as coroutine from "coroutine";
 import * as net from "net";
+import * as fs from "fs";
 import {getServerOpts, WebServerConfig} from "./newWebServer";
 import {dateTimeStr} from "./dateTime";
 
@@ -120,6 +121,11 @@ export class WebCluster{
         (<any>process).off("SIGINT",self.on_SIGINT);
         (<any>process).off("dispatch_events",self.on_dispatch_events);
         console.warn("WebCluster.stop");
+        if (this.watcherList) {
+            this.watcherList.forEach(e => e.close());
+            this.watcherList.length = 0;
+            clearTimeout(this.watch_file_delay_reload_timer);
+        }
     }
     public reload(){
         this.clusters.forEach(w=>{
@@ -139,6 +145,34 @@ export class WebCluster{
             }
         })
     }
+
+    private watcherList: Array<Class_FSWatcher>;
+    private watcherTtl: number;
+
+    public watchReload(dirs: string[], ttl = 3000) {
+        const self = this;
+        self.watcherTtl = ttl;
+        let watchs = self.watcherList = [];
+        let watch_fn = self.onFileWatch.bind(self);
+        dirs.forEach(e => {
+            watchs.push(fs.watch(e, {recursive:true}, watch_fn));
+        });
+    }
+
+    private watch_file_delay_reload_timer: Class_Timer;
+
+    private onFileWatch(e, k) {
+        let self = this;
+        if (self.watch_file_delay_reload_timer) {
+            clearTimeout(self.watch_file_delay_reload_timer);
+        }
+        self.watch_file_delay_reload_timer = setTimeout(() => {
+            self.watch_file_delay_reload_timer = null;
+            if (self.runIng)
+                self.reload();
+        }, self.watcherTtl);
+    }
+
     public pause(){
         this.pauseIng=true;
     }

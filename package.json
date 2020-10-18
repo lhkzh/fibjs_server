@@ -1,6 +1,6 @@
 {
   "name": "fibjs_server",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "",
   "main": "./lib/index.js",
   "types": "./@types/index.d.ts",
@@ -10,7 +10,14 @@
   "license": "ISC",
   "dependencies": {},
   "devDependencies": {
-    "@fibjs/types": "^0.29.0"
+    "@fibjs/types": "^0.31.0"
   },
-  "peerDependencies": {}
+  "peerDependencies": {},
+  "files": [
+    "package.json",
+    "tsconfig.json",
+    "@types",
+    "src",
+    "lib"
+  ]
 }
