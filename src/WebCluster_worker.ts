@@ -5,8 +5,9 @@ import * as mq from "mq";
 import * as vm from "vm";
 import {getServerOpts, WebServerConfig} from "./newWebServer";
 
-if (!global["$cbks"]) {
-    global["$cbks"] = {};
+const Key_CallBacks = "$WebCluster_worker_cbks";
+if (!global[Key_CallBacks]) {
+    global[Key_CallBacks] = {};
 }
 let clusterIndex: number;//当前第几个cluster
 let clusterTotal: number;//一共多少个cluster
@@ -37,7 +38,7 @@ Master.onmessage = e => {
         Master.postMessage('ready');
     } else if (e.data.fn == "reload") {
         // httpHandler = new mq.HttpHandler(new_web_handler());
-        // httpHandler.serverName="nginx";
+        // httpHandler.serverName = "nginx";
         // if(httpCrossOriginHeaders){
         //     httpHandler.enableCrossOrigin(httpCrossOriginHeaders);
         // }
@@ -53,9 +54,9 @@ Master.onmessage = e => {
     } else if (e.data.fn == "editServerInfo") {
         editHttpHandler(e.data.crossOriginHeaders, e.data.opts);
     } else if (e.data.fn == "cbk") {
-        var fnWrap = global["$cbks"][e.data.i];
+        var fnWrap = global[Key_CallBacks][e.data.i];
         if (fnWrap) {
-            delete global["$cbks"][e.data.i];
+            delete global[Key_CallBacks][e.data.i];
             fnWrap.fn.apply(fnWrap.$, e.data.args);
         }
     } else if (e.data.fn == "fn_event_process") {
@@ -80,7 +81,7 @@ function editHttpHandler(crossOriginHeaders: string, svr_opts: { [index: string]
             }
         }
     } catch (e) {
-        console.error("WebCluster_worker|", e);
+        console.error("WebCluster_worker|edit_"+clusterIndex, e);
     }
 }
 
@@ -106,17 +107,19 @@ function init(data: WebServerConfig & { i: number }) {
         Master.postMessage({fn: "dispatch_events", type: type, value: value});
         (<any>process).emit(type, value);
     }
-    if (globalKey && !global.hasOwnProperty(globalKey)) global[globalKey] = {
-        cluster: {index: clusterIndex, total: clusterTotal},
-        close: () => Master.postMessage("close"),
-        run: () => Master.postMessage("run"),
-        reload: () => Master.postMessage("reload"),
-        autoReload: (t: number = 10000) => {
-        },
-        pause: () => Master.postMessage("pause"),
-        reuse: () => Master.postMessage("reuse"),
-        edit: (crossOriginHeaders: string, svr_opts?: { [index: string]: number | string }) => {
-            Master.postMessage({fn: "editServerInfo", crossOriginHeaders: crossOriginHeaders, opts: svr_opts});
+    if (globalKey && !global.hasOwnProperty(globalKey)){
+        global[globalKey] = {
+            cluster: {index: clusterIndex, total: clusterTotal},
+            close: () => Master.postMessage("close"),
+            run: () => Master.postMessage("run"),
+            reload: () => Master.postMessage("reload"),
+            autoReload: (t: number = 10000) => {
+            },
+            pause: () => Master.postMessage("pause"),
+            reuse: () => Master.postMessage("reuse"),
+            edit: (crossOriginHeaders: string, svr_opts?: { [index: string]: number | string }) => {
+                Master.postMessage({fn: "editServerInfo", crossOriginHeaders: crossOriginHeaders, opts: svr_opts});
+            }
         }
     }
     editHttpHandler(data.crossOriginHeaders, httpServerOpts);

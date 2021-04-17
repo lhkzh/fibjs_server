@@ -1,5 +1,4 @@
 import * as path from "path";
-import * as os from "os";
 import * as util from "util";
 import * as coroutine from "coroutine";
 import * as net from "net";
@@ -7,10 +6,6 @@ import * as fs from "fs";
 import {getServerOpts, WebServerConfig} from "./newWebServer";
 import {dateTimeStr} from "./dateTime";
 
-const defaultOptions = {
-    numbers: Math.max(1, os.cpuNumbers() - 1),
-    backlog: 2048
-};
 const _worker = path.join(__dirname, 'WebCluster_worker.js');
 
 /**
@@ -27,7 +22,7 @@ export class WebCluster {
 
     constructor(options: WebServerConfig) {
         delete options["mods"];
-        let cfg: WebServerConfig = Object.assign({}, defaultOptions, options);
+        let cfg: WebServerConfig = options;
         cfg.dir = cfg.dir || path.dirname(cfg.worker);
         this.cfg = cfg;
         this.svr_opts = getServerOpts(cfg);
