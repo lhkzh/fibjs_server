@@ -8,9 +8,8 @@
   "author": "",
   "homepage": "https://github.com/lhkzh/fibjs_server",
   "license": "ISC",
-  "dependencies": {},
   "devDependencies": {
-    "@fibjs/types": "^0.31.0"
+    "@fibjs/types": "^0.32.0"
   },
   "peerDependencies": {},
   "files": [
