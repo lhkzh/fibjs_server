@@ -74,3 +74,5 @@ export function newWebServer(more: boolean, opts: WebServerConfig): WebServer {
     }
     return more ? new WebCluster(opts) : new WebSimple(opts);
 }
+
+export var KeyRequireFunction = "$vm_require$";

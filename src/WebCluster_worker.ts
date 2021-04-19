@@ -3,7 +3,8 @@
 import * as util from "util";
 import * as mq from "mq";
 import * as vm from "vm";
-import {getServerOpts, WebServerConfig} from "./newWebServer";
+import {getServerOpts, KeyRequireFunction, WebServerConfig} from "./newWebServer";
+import * as coroutine from "coroutine";
 
 const Key_CallBacks = "$WebCluster_worker_cbks";
 if (!global[Key_CallBacks]) {
@@ -87,11 +88,15 @@ function editHttpHandler(crossOriginHeaders: string, svr_opts: { [index: string]
 
 function new_web_handler() {
     const box = new vm.SandBox({}, require);
-    global["vm_require"] = function (s) {
+    coroutine.current()[KeyRequireFunction] = global[KeyRequireFunction] = function (s) {
         // console.log(s);
         return box.require(s, httpJsDir);
     };
-    return box.require(httpJsFile, httpJsDir);
+    try{
+        return box.require(httpJsFile, httpJsDir);
+    }finally {
+        delete global[KeyRequireFunction];
+    }
 }
 
 function init(data: WebServerConfig & { i: number }) {

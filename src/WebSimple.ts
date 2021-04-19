@@ -3,7 +3,7 @@ import * as http from "http";
 import * as vm from "vm";
 import * as coroutine from "coroutine";
 import * as fs from "fs";
-import {getServerOpts, WebServerConfig} from "./newWebServer";
+import {getServerOpts, KeyRequireFunction, WebServerConfig} from "./newWebServer";
 import {dateTimeStr} from "./dateTime";
 
 export class WebSimple {
@@ -69,11 +69,15 @@ export class WebSimple {
         }
         var box = this.sandboxGlobal ? new vm.SandBox(this.sandboxMods, require, this.sandboxGlobal) : new vm.SandBox(this.sandboxMods, require);
         var dir = this.worker_dir;
-        (this.sandboxGlobal || global)["vm_require"] = s => {
+        coroutine.current()[KeyRequireFunction] = (this.sandboxGlobal || global)[KeyRequireFunction] = s => {
             // console.log(s);
             return box.require(s, dir);
         };
-        return box.require(this.worker_file, dir);
+        try{
+            return box.require(this.worker_file, dir);
+        }finally {
+            delete (this.sandboxGlobal || global)[KeyRequireFunction];
+        }
     }
 
     private checkChangeAndApplyOpts(opts?: { [index: string]: number | string }) {
