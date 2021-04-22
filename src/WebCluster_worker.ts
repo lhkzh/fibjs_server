@@ -4,7 +4,6 @@ import * as util from "util";
 import * as mq from "mq";
 import * as vm from "vm";
 import {getServerOpts, KeyRequireFunction, WebServerConfig} from "./newWebServer";
-import * as coroutine from "coroutine";
 
 const Key_CallBacks = "$WebCluster_worker_cbks";
 if (!global[Key_CallBacks]) {
@@ -88,7 +87,7 @@ function editHttpHandler(crossOriginHeaders: string, svr_opts: { [index: string]
 
 function new_web_handler() {
     const box = new vm.SandBox({}, require);
-    coroutine.current()[KeyRequireFunction] = global[KeyRequireFunction] = function (s) {
+    global[KeyRequireFunction] = function (s) {
         // console.log(s);
         return box.require(s, httpJsDir);
     };

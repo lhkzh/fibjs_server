@@ -1,6 +1,6 @@
 {
   "name": "fibjs_server",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "",
   "main": "./lib/index.js",
   "types": "./@types/index.d.ts",
@@ -16,7 +16,6 @@
     "package.json",
     "tsconfig.json",
     "@types",
-    "src",
     "lib"
   ],
   "keywords": ["fibjs", "WebServer-Adpater"]

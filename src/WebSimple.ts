@@ -69,7 +69,7 @@ export class WebSimple {
         }
         var box = this.sandboxGlobal ? new vm.SandBox(this.sandboxMods, require, this.sandboxGlobal) : new vm.SandBox(this.sandboxMods, require);
         var dir = this.worker_dir;
-        coroutine.current()[KeyRequireFunction] = (this.sandboxGlobal || global)[KeyRequireFunction] = s => {
+        (this.sandboxGlobal || global)[KeyRequireFunction] = s => {
             // console.log(s);
             return box.require(s, dir);
         };
