@@ -1,6 +1,7 @@
 import { WebServerConfig } from "./newWebServer";
 export declare class WebSimple {
     private port;
+    private localUrl;
     private worker_file;
     private worker_dir;
     private svr_opts;

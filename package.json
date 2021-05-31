@@ -1,6 +1,6 @@
 {
   "name": "fibjs_server",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "",
   "main": "./lib/index.js",
   "types": "./@types/index.d.ts",
@@ -9,7 +9,7 @@
   "homepage": "https://github.com/lhkzh/fibjs_server",
   "license": "ISC",
   "devDependencies": {
-    "@fibjs/types": "^0.32.0"
+    "@fibjs/types": "^0.33.0"
   },
   "peerDependencies": {},
   "files": [
@@ -18,5 +18,8 @@
     "@types",
     "lib"
   ],
-  "keywords": ["fibjs", "WebServer-Adpater"]
+  "keywords": [
+    "fibjs",
+    "WebServer-Adpater"
+  ]
 }

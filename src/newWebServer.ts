@@ -31,8 +31,8 @@ export interface WebServer {
 export interface WebServerConfig {
     //载入路由的js文件路径
     worker: string,
-    //http服务器端口
-    port: number,
+    //http服务器端口or UnixDomainPath
+    port?: number|string,
     //跨域-响应头
     crossOriginHeaders?: string,
     //服务器的响应头server的值，默认nginx

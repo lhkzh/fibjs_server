@@ -202,11 +202,10 @@ export class WebCluster {
             throw new Error('server is already running!');
         }
         self.startClusters();
-        const socket = self.socket = new net.Socket();
-        ;
+        const socket = self.socket = new net.Socket(Number.isInteger(parseInt(String(this.cfg.port))) ? net.AF_INET:net.AF_UNIX);
         const opts = self.cfg;
         try {
-            socket.bind(opts.port);
+            socket.bind(<any>opts.port);
             socket.listen(self.cfg.backlog);
             let idx = 0;
             self.runIng = true;

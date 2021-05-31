@@ -7,7 +7,8 @@ import {getServerOpts, KeyRequireFunction, WebServerConfig} from "./newWebServer
 import {dateTimeStr} from "./dateTime";
 
 export class WebSimple {
-    private port: number;
+    private port: number|string;
+    private localUrl: string;
     private worker_file: string;
     private worker_dir: string;
     private svr_opts: { [index: string]: number | string };
@@ -20,7 +21,7 @@ export class WebSimple {
     private logMore: boolean;
 
     public constructor(opts: WebServerConfig) {
-        this.port = opts.port || 8000;
+        this.port = opts.port||8080;
         this.crossOriginHeaders = opts.crossOriginHeaders;
         this.svr_opts = getServerOpts(opts);
         this.worker_file = opts.worker;
@@ -52,7 +53,7 @@ export class WebSimple {
         if (this.svr != null) {
             return;
         }
-        this.svr = new http.Server(this.port, this.new_handler());
+        this.svr = new http.Server(<any>this.port, this.new_handler());
         this.edit(this.crossOriginHeaders, this.svr_opts);
         this.svr.start ? this.svr.start() : this.svr["asyncRun"]();
         this.runIng = true;

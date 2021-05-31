@@ -22,7 +22,7 @@ export interface WebServer {
  */
 export interface WebServerConfig {
     worker: string;
-    port: number;
+    port?: number | string;
     crossOriginHeaders?: string;
     serverName?: string;
     maxBodySize?: number;
