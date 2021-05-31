@@ -59,7 +59,7 @@ export class WebCluster {
                     self.reuse();
                 }
             } else if (util.isObject(e.data)) {
-                if (util.isNumber(e.data.reward_to)) {//线程中转消息
+                if (Number.isInteger(e.data.reward_to)) {//线程中转消息
                     self.clusters[e.data.reward_to].postMessage(e.data);
                 } else if (e.data.fn == "edit_global" && e.data.key && e.data.value !== undefined) {
                     global[e.data.key] = e.data.value;

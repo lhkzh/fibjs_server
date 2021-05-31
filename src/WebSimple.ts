@@ -8,7 +8,6 @@ import {dateTimeStr} from "./dateTime";
 
 export class WebSimple {
     private port: number|string;
-    private localUrl: string;
     private worker_file: string;
     private worker_dir: string;
     private svr_opts: { [index: string]: number | string };
@@ -55,7 +54,7 @@ export class WebSimple {
         }
         this.svr = new http.Server(<any>this.port, this.new_handler());
         this.edit(this.crossOriginHeaders, this.svr_opts);
-        this.svr.start ? this.svr.start() : this.svr["asyncRun"]();
+        this.svr.start();
         this.runIng = true;
         (<any>process).on("exit", this.on_beforeExit);
         (<any>process).on("beforeExit", this.on_beforeExit);
@@ -122,7 +121,7 @@ export class WebSimple {
 
     public autoReload(ttl: number = 2000) {
         if (ttl < 1) return;
-        var self = this;
+        let self = this;
         coroutine.start(function () {
             while (self.svr != null && self.runIng) {
                 coroutine.sleep(ttl);
