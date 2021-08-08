@@ -36,6 +36,15 @@ export interface WebServerConfig {
     backlog?: number;
     globalKey?: string;
     logMore?: boolean;
+    certs?: {
+        name?: string;
+        crt: string;
+        key: string;
+    } | Array<{
+        name?: string;
+        crt: string;
+        key: string;
+    }>;
 }
 export declare function getServerOpts(cfg: WebServerConfig, optsDefault?: {
     serverName: string;

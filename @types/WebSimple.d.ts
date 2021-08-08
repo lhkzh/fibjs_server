@@ -11,9 +11,11 @@ export declare class WebSimple {
     private opt_pause;
     private runIng;
     private logMore;
+    private certs;
     constructor(opts: WebServerConfig);
     stop(): void;
     start(): void;
+    private new_server;
     private new_handler;
     private checkChangeAndApplyOpts;
     edit(crossOrginHeaders: string, svr_opts?: {

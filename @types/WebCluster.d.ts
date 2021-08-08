@@ -13,6 +13,8 @@ export declare class WebCluster {
         index: number;
         total: number;
     };
+    private certs;
+    private ssl_socket;
     constructor(options: WebServerConfig);
     private newWorker;
     private startClusters;
@@ -29,6 +31,7 @@ export declare class WebCluster {
     reuse(): void;
     private accept;
     start(): void;
+    private new_ssl_socket;
     private checkChangeAndApplyOpts;
     edit(crossOriginHeaders: string, opts?: {
         [index: string]: number | string;

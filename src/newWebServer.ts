@@ -50,7 +50,9 @@ export interface WebServerConfig {
     //在global上绑定的server变量名，会global[$globalKey]=newWebServerObj()
     globalKey?: string,
     //输出更多的日志
-    logMore?: boolean
+    logMore?: boolean,
+    //ssl_certs
+    certs?:{name?:string,crt:string,key:string}|Array<{name?:string,crt:string,key:string}>
 }
 
 export function getServerOpts(cfg: WebServerConfig, optsDefault = {
@@ -75,4 +77,4 @@ export function newWebServer(more: boolean, opts: WebServerConfig): WebServer {
     return more ? new WebCluster(opts) : new WebSimple(opts);
 }
 
-export var KeyRequireFunction = "$vm_require$";
+export let KeyRequireFunction = "$vm_require$";

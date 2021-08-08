@@ -5,6 +5,7 @@ import * as coroutine from "coroutine";
 import * as fs from "fs";
 import {getServerOpts, KeyRequireFunction, WebServerConfig} from "./newWebServer";
 import {dateTimeStr} from "./dateTime";
+import crypto = require("crypto");
 
 export class WebSimple {
     private port: number|string;
@@ -18,8 +19,10 @@ export class WebSimple {
     private opt_pause: boolean;
     private runIng: boolean;
     private logMore: boolean;
+    private certs:{name?:string,crt:string,key:string}|Array<{name?:string,crt:string,key:string}>;
 
     public constructor(opts: WebServerConfig) {
+        this.certs = opts.certs;
         this.port = opts.port||8080;
         this.crossOriginHeaders = opts.crossOriginHeaders;
         this.svr_opts = getServerOpts(opts);
@@ -52,7 +55,7 @@ export class WebSimple {
         if (this.svr != null) {
             return;
         }
-        this.svr = new http.Server(<any>this.port, this.new_handler());
+        this.svr = <Class_HttpServer>this.new_server();
         this.edit(this.crossOriginHeaders, this.svr_opts);
         this.svr.start();
         this.runIng = true;
@@ -60,6 +63,30 @@ export class WebSimple {
         (<any>process).on("beforeExit", this.on_beforeExit);
         (<any>process).on("SIGINT", this.on_SIGINT);
         console.warn(dateTimeStr(), "WebSimple.start", this.port);
+    }
+
+    private new_server(){
+        let certs = this.certs;
+        if(certs && (!Array.isArray(certs) || certs.length)){
+            if(!Array.isArray(certs)){
+                certs = [certs];
+            }
+            let arr:any[] = [];
+            (<any[]>certs).forEach(r=>{
+                let e:any = {};
+                if(r.name){
+                    e[r.name] = r.name;
+                }
+                e.crt = crypto.loadCert(r.crt);
+                e.key = crypto.loadPKey(r.key);
+                arr.push(e);
+            });
+            if(arr.length==1&&!arr[0].name){
+                return  new http.HttpsServer(arr[0].crt, arr[0].key, <number>this.port, this.new_handler());
+            }
+            return new http.HttpsServer(arr, <number>this.port, this.new_handler());
+        }
+        return  new http.Server(<any>this.port, this.new_handler());
     }
 
     private new_handler() {

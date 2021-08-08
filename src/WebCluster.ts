@@ -3,8 +3,10 @@ import * as util from "util";
 import * as coroutine from "coroutine";
 import * as net from "net";
 import * as fs from "fs";
+import * as crypto from "crypto";
 import {getServerOpts, WebServerConfig} from "./newWebServer";
 import {dateTimeStr} from "./dateTime";
+import * as ssl from "ssl";
 
 const _worker = path.join(__dirname, 'WebCluster_worker.js');
 
@@ -19,6 +21,8 @@ export class WebCluster {
     private clusters: Class_Worker[];
     private socket: Class_Socket;
     public cluster: { index: number, total: number };
+    private certs:{name?:string,crt:string,key:string}|Array<{name?:string,crt:string,key:string}>;
+    private ssl_socket:Class_SslSocket;
 
     constructor(options: WebServerConfig) {
         delete options["mods"];
@@ -27,6 +31,7 @@ export class WebCluster {
         this.cfg = cfg;
         this.svr_opts = getServerOpts(cfg);
         this.clusters = [];
+        this.certs = options.certs;
 
         const self = this;
 
@@ -105,7 +110,7 @@ export class WebCluster {
         const self = this;
         let clusters = self.clusters;
         self.post("@destory@");
-        self.clusters.length = 0;
+        clusters.length = 0;
     }
 
     public stop() {
@@ -192,6 +197,14 @@ export class WebCluster {
             if (idx >= self.cfg.numbers) {
                 idx = 0;
             }
+            if(self.ssl_socket){
+                try{
+                    con = <any>self.ssl_socket.accept(<any>con);
+                }catch (e){
+                    con.close();
+                    return;
+                }
+            }
             self.clusters[idx++].postMessage(con);
         }
     }
@@ -202,6 +215,7 @@ export class WebCluster {
             throw new Error('server is already running!');
         }
         self.startClusters();
+        self.ssl_socket = Number.isInteger(parseInt(String(this.cfg.port))) ? this.new_ssl_socket():null;
         const socket = self.socket = new net.Socket(Number.isInteger(parseInt(String(this.cfg.port))) ? net.AF_INET:net.AF_UNIX);
         const opts = self.cfg;
         try {
@@ -222,7 +236,27 @@ export class WebCluster {
         (<any>process).on("dispatch_events", self.on_dispatch_events);
         console.warn(dateTimeStr(), "WebCluster.start", opts.port);
     }
-
+    private new_ssl_socket(){
+        let certs = this.certs;
+        if(certs && (!Array.isArray(certs) || certs.length)) {
+            //     this.svr = new http.HttpsServer(crypto.loadCert(certs.crt), crypto.loadPKey(certs.key), <number>this.port, this.new_handler());
+            if (!Array.isArray(certs)) {
+                certs = [certs];
+            }
+            let arr: any[] = [];
+            (<any[]>certs).forEach(r => {
+                let e: any = {};
+                if (r.name) {
+                    e[r.name] = r.name;
+                }
+                e.crt = crypto.loadCert(r.crt);
+                e.key = crypto.loadPKey(r.key);
+                arr.push(e);
+            });
+            return new ssl.Socket(arr)
+        }
+        return null;
+    }
     private checkChangeAndApplyOpts(opts?: { [index: string]: number | string }) {
         let changed = false;
         if (opts) {
